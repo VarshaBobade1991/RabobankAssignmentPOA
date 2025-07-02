@@ -1,10 +1,19 @@
-# 🔐 Power of Attorney (POA) API Documentation
+# Power of Attorney (POA) API Documentation
 
 ##  Overview
 
 The **POA App** is a secure, stateless REST API that allows grantors to authorize grantees with read/write access to bank accounts. Built using Spring Boot, MongoDB, and secured via OAuth2 JWT tokens, the service is containerized with Docker and ready for observability via Prometheus and OpenAPI Swagger UI.
 
 ---
+## Assumptions for Power of Attorney (POA) Application
+
+1. A single grantor can issue multiple POAs for the same account — Each POA may be for different grantees and access types.
+
+2.  Multiple grantors can delegate POAs for the same account — Ownership or control may be shared across business or joint account holders.
+
+3.  Each POA is uniquely defined by the combination of: accountNumber, grantee and accessType
+
+4.  An account number must always map to exactly one account type — Once an account is designated as, e.g., PAYMENT, no other POA may associate it with a conflicting type like SAVINGS.
 
 ##  Features
 

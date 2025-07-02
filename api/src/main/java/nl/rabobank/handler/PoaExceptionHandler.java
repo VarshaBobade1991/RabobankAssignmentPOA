@@ -1,5 +1,6 @@
 package nl.rabobank.handler;
 
+import nl.rabobank.exception.DuplicateAccountTypeMappingException;
 import nl.rabobank.exception.DuplicatePoaException;
 import nl.rabobank.exception.PoaNotFoundException;
 import org.slf4j.Logger;
@@ -40,5 +41,12 @@ public class PoaExceptionHandler {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+    }
+
+    @ExceptionHandler(DuplicateAccountTypeMappingException.class)
+    public ResponseEntity<Map<String, String>> handleDuplicateAccountTypeMapping(DuplicateAccountTypeMappingException ex) {
+        log.info("Duplicate Account Type mapping detected:  {}", ex.getMessage());
+        Map<String, String> error = Map.of("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 }

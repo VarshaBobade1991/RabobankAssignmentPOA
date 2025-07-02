@@ -7,6 +7,7 @@ import nl.rabobank.document.PowerOfAttorneyDocument;
 import nl.rabobank.Mapper.PoaMapper;
 import nl.rabobank.dto.PoaRequest;
 import nl.rabobank.dto.PoaResponse;
+import nl.rabobank.exception.DuplicateAccountTypeMappingException;
 import nl.rabobank.exception.DuplicatePoaException;
 import nl.rabobank.exception.PoaNotFoundException;
 import nl.rabobank.repository.PowerOfAttorneyRepository;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,8 +30,11 @@ public class PowerOfAttorneyService implements AuthorizationService, AccessQuery
     @Override
     public PoaResponse grantAccess(PoaRequest request) throws DuplicatePoaException {
         String grantee = request.getGrantee();
+        String accountNumber = request.getAccountNumber();
+        String accountType = request.getAccountType();
         log.info("Attempting to grant POA to grantee: {}", grantee);
-        checkIfAccessPresent(grantee, request.getAccountNumber(), request.getAccessType());
+        checkIfAccessPresent(grantee, accountNumber, request.getAccessType());
+        validateAccountUniqueness(accountNumber,accountType);
         try {
             log.info("Granting Power of Attorney to grantee.");
             PowerOfAttorney poa = mapper.toDomain(request);
@@ -59,4 +64,17 @@ public class PowerOfAttorneyService implements AuthorizationService, AccessQuery
             throw new DuplicatePoaException("Access already granted for this grantee, account, and access type.");
         }
     }
+
+    void validateAccountUniqueness(String accountNumber, String accountType) {
+        Optional<PowerOfAttorneyDocument> existing = repository.findByAccountNumber(accountNumber);
+        if (existing.isPresent()) {
+            String existingType = existing.get().getAccountType();
+            if (!existingType.equalsIgnoreCase(accountType)) {
+                throw new DuplicateAccountTypeMappingException(
+                        String.format("Account %s is already registered as type '%s'",
+                                accountNumber, existingType));
+            }
+        }
+    }
+
 }

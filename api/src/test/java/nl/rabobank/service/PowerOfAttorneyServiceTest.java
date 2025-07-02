@@ -4,6 +4,7 @@ import nl.rabobank.authorizations.PowerOfAttorney;
 import nl.rabobank.document.PowerOfAttorneyDocument;
 import nl.rabobank.Mapper.PoaMapper;
 import nl.rabobank.dto.PoaRequest;
+import nl.rabobank.exception.DuplicateAccountTypeMappingException;
 import nl.rabobank.exception.DuplicatePoaException;
 import nl.rabobank.exception.PoaNotFoundException;
 import nl.rabobank.repository.PowerOfAttorneyRepository;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static nl.rabobank.constants.PoaConstants.READ;
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,13 +36,17 @@ class PowerOfAttorneyServiceTest {
 
     @Test
     void shouldGrantAccessAndSavePoa() throws DuplicatePoaException {
+        String grantee = "Alice";
+        String accountNumber = "1234567890";
+        String accessType = READ;
         PoaRequest request = new PoaRequest();
-        request.setGrantee("Alice");
-        request.setAccountNumber("1234567890");
-        request.setAccessType(READ);
+        request.setGrantee(grantee);
+        request.setAccountNumber(accountNumber);
+        request.setAccessType(accessType);
         PowerOfAttorney powerOfAttorney = PowerOfAttorney.builder().build();
         PowerOfAttorneyDocument document = new PowerOfAttorneyDocument(); // Mongo document
-        when(repository.existsByGranteeAndAccountNumberAndAccessType(anyString(), anyString(), anyString())).thenReturn(false);
+        when(repository.existsByGranteeAndAccountNumberAndAccessType(grantee, accountNumber, accessType)).thenReturn(false);
+        when(repository.findByAccountNumber(accountNumber)).thenReturn(Optional.empty());
         when(mapper.toDocument(powerOfAttorney)).thenReturn(document);
         when(mapper.toDomain(request)).thenReturn(powerOfAttorney);
 
@@ -82,10 +88,8 @@ class PowerOfAttorneyServiceTest {
         request.setAccessType(accessType);
 
         when(repository.existsByGranteeAndAccountNumberAndAccessType(grantee, accountNumber, accessType)).thenReturn(true);
-
         assertThrows(DuplicatePoaException.class, () -> service.grantAccess(request));
 
-        verify(repository).existsByGranteeAndAccountNumberAndAccessType(grantee, accountNumber, accessType);
         verifyNoMoreInteractions(mapper, repository);
     }
 
@@ -98,5 +102,27 @@ class PowerOfAttorneyServiceTest {
         assertThrows(PoaNotFoundException.class, () -> service.getAccessForGrantee(grantee));
         verify(repository).findAllByGranteeIgnoreCase(grantee);
         verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenDuplicateAccountTypeMappingOccur() {
+        String accountNumber = "1234567890";
+        String originalType = "PAYMENT";
+        String conflictingType = "SAVINGS";
+
+        PowerOfAttorneyDocument existing = new PowerOfAttorneyDocument();
+        existing.setAccountNumber(accountNumber);
+        existing.setAccountType(originalType);
+
+        PoaRequest request = new PoaRequest();
+        request.setAccountNumber(accountNumber);
+        request.setAccountType(conflictingType);
+
+        when(repository.findByAccountNumber(accountNumber))
+                .thenReturn(Optional.of(existing));
+
+        assertThrows(DuplicateAccountTypeMappingException.class, () -> {
+            service.validateAccountUniqueness(request.getAccountNumber(), request.getAccountType());
+        });
     }
 }
